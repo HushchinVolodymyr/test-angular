@@ -1,0 +1,62 @@
+<header class="w-full flex h-16 items-center justify-between p-4 lg:w-4/5 lg:mx-auto">
+  <h1 class="text-3xl">Test task</h1>
+  <div class="hidden md:flex md:gap-2">
+    <p-button
+      label="Update Weather"
+      icon="fa fa-refresh"
+      (click)="getUsersWeatherData()"/>
+    <p-button
+      icon="fa fa-user"
+      label="Get new users"
+      (click)="getUsers()"/>
+  </div>
+  <div class="flex gap-2 md:hidden">
+    <p-button
+      icon="fa fa-refresh"
+      (click)="getUsersWeatherData()"/>
+    <p-button
+      icon="fa fa-user"
+      (click)="getUsers()"/>
+  </div>
+
+</header>
+
+<main class="p-4">
+  <div class="w-full grid grid-cols-1 gap-4 md:grid md:grid-cols-2 lg:w-4/5 lg:mx-auto lg:grid-cols-3 xl:grid-cols-4">
+    @for (user of users; track user) {
+      <p-card [style]="{height: '435px'}">
+        <div class="h-[200px]">
+          <div class="flex gap-2 h-24 w-full">
+            <img
+              [src]="user.picture.medium"
+              class="rounded-full"
+              alt="user-picture">
+            <div>
+              <h1 class="font-bold text-2xl text-white">{{ user.name }}</h1>
+              <h1 class="text-xl">{{ user.gender }}</h1>
+            </div>
+          </div>
+          <div class="mt-4">
+            <h1 class="text-l">Email: {{ user.email }}</h1>
+            <p class="text-l">Country: {{ user.location.country }}</p>
+            <p class="text-l">City: {{ user.location.city }}</p>
+          </div>
+        </div>
+        <p-divider/>
+        <div>
+          <div class="flex text-2xl items-center gap-2">
+            <i class="fa {{ user.weather?.condition?.icon}}"></i>
+            <h1>{{ user.weather?.condition?.description }}</h1>
+          </div>
+          <div class="">
+            <h1 class="text-l">Current temperature: {{ user.weather?.current_temperature }}</h1>
+            <h1 class="text-l">Max temperature: {{ user.weather?.max_temperature }}</h1>
+            <h1 class="text-l">Min temperature: {{ user.weather?.min_temperature }}</h1>
+          </div>
+
+        </div>
+      </p-card>
+    }
+  </div>
+</main>
+
