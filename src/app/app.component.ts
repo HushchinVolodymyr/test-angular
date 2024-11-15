@@ -24,7 +24,6 @@ export class AppComponent implements OnInit {
   http = inject(HttpClient);
   // Users array implements from User interface
   users: User[] = [];
-  //
 
   // Constructor takes private toasterService
   constructor(private toaster: ToastrService) {}
@@ -68,10 +67,15 @@ export class AppComponent implements OnInit {
     await this.getUsersWeatherData();
   }
 
+  // New comment
+
   // Get users weather data
   async getUsersWeatherData() {
     // Iterate over users and set weather conditions
     for (let user of this.users) {
+
+
+
       try {
         const url =`https://api.open-meteo.com/v1/forecast?latitude=${user.location.coordinates.latitude}` +
           `&longitude=${user.location.coordinates.longitude}&current_weather=true&hourly=temperature_2m`;
