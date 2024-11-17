@@ -1,15 +1,16 @@
-import { Component, inject, OnInit } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import {Component, inject, OnInit} from '@angular/core';
+import {RouterOutlet} from '@angular/router';
+import {HttpClient} from '@angular/common/http';
 import UserApiResponse from '../models/UserApiResponse';
 import User from '../models/User';
-import { ToastrService } from 'ngx-toastr';
-import { WeatherResponse } from '../models/WeatherResponse';
-import { firstValueFrom } from 'rxjs';
+import {ToastrService} from 'ngx-toastr';
+import {WeatherResponse} from '../models/WeatherResponse';
+import { map, tap} from 'rxjs';
 import {Button} from 'primeng/button';
 import {CardModule} from 'primeng/card';
 import {DividerModule} from 'primeng/divider';
 import {ToastModule} from 'primeng/toast';
+import {UserFromApi} from '../models/UserFromApi';
 
 @Component({
   selector: 'app-root',
@@ -18,7 +19,7 @@ import {ToastModule} from 'primeng/toast';
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit{
   title = 'test app';
   // Http provider
   http = inject(HttpClient);
@@ -26,91 +27,83 @@ export class AppComponent implements OnInit {
   users: User[] = [];
 
   // Constructor takes private toasterService
-  constructor(private toaster: ToastrService) {}
+  constructor(private toaster: ToastrService) {
+  }
 
   // Process on init component
-  async ngOnInit(): Promise<void> {
+  ngOnInit() {
     // First, get users and wait for it to complete
-    await this.getUsers();
+    this.getUsers()
   }
 
   // Request to API to get 10 users
-  async getUsers() {
-    try {
-      // Request to server
-      const response = await firstValueFrom(this.http.get<UserApiResponse>('https://randomuser.me/api/?results=10'));
-
-      // Delete users id they exist
-      if (this.users) this.users = [];
-
-      // Convert user data from server response
-      response.results.map((api_user, index) => {
-        // Create user object and fill with data
-        let user: User = {
-          id: index,
-          name: api_user.name.title + ' ' + api_user.name.first + ' ' + api_user.name.last,
-          gender: api_user.gender,
-          email: api_user.email,
-          picture: api_user.picture,
-          location: api_user.location
-        };
-
-        // Push user to users array with formatted data
-        this.users.push(user);
+  getUsers() {
+    this.http.get<UserApiResponse>('https://randomuser.me/api/?results=10')
+      // Pipe the observable and map the response to the users array
+      .pipe(
+        // Map the response to the users array
+        map(response => response.results.map((user, index) => this.transformUser(user, index))),
+        // Catch any errors and show a toast
+        tap({
+          error: () => this.toaster.error('Error fetching users', 'Error')
+        })
+      )
+      // Subscribe to the observable and assign the users to the array and weather data
+      .subscribe(users => {
+        // Set users array
+        this.users = users;
+        // Get users weather data
+        this.getUsersWeatherData();
       });
-    } catch (error: any) {
-      this.toaster.error('Server error occurred while fetching users!', error);
-      console.error(error);
-    }
-
-    // Take users weather
-    await this.getUsersWeatherData();
   }
 
-  // New comment
 
-  // Get users weather data
-  async getUsersWeatherData() {
+
+  getUsersWeatherData() {
     // Iterate over users and set weather conditions
-    for (let user of this.users) {
+    this.users.map( user => {
+      // Url with user data
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${user.location.coordinates.latitude}` +
+        `&longitude=${user.location.coordinates.longitude}&current_weather=true&hourly=temperature_2m`;
 
+      // Get weather data from the API
+      this.http.get<WeatherResponse>(url)
+        .pipe(
+          // Set user weather data
+          map(response => this.setUserWeather(user, response)),
+          // Catch any errors and show a toast
+          tap({
+            error: () => this.toaster.error('Error fetching weather data', 'Error')
+          })
+        )
+        .subscribe();
+    })
+  }
 
+  // Transform user from API to User
+  transformUser(userFromApi: UserFromApi, index: number): User {
+    return {
+      id: index,
+      name: `${userFromApi.name.first} ${userFromApi.name.last}`,
+      gender: userFromApi.gender,
+      email: userFromApi.email,
+      picture: userFromApi.picture,
+      location: userFromApi.location,
+      weather: undefined
+    };
+  }
 
-      try {
-        const url =`https://api.open-meteo.com/v1/forecast?latitude=${user.location.coordinates.latitude}` +
-          `&longitude=${user.location.coordinates.longitude}&current_weather=true&hourly=temperature_2m`;
-
-        // Send request to server and await response
-        const response = await firstValueFrom(this.http.get<WeatherResponse>(url));
-
-        // Format data and set to user
-        if (!user.weather) {
-          // If weather data does not exist, create and fill
-          user.weather = {
-            weather_code: response.current_weather.weathercode,
-            condition: {
-              description: this.getWeatherDescription(response.current_weather.weathercode).description,
-              icon: this.getWeatherDescription(response.current_weather.weathercode).icon,
-            } ,
-            current_temperature: response.current_weather.temperature,
-            max_temperature: Math.max(...response.hourly.temperature_2m),
-            min_temperature: Math.min(...response.hourly.temperature_2m),
-          };
-        } else {
-          // If weather data exists, update it
-          user.weather.weather_code = response.current_weather.weathercode;
-          user.weather.condition.description = this.getWeatherDescription(response.current_weather.weathercode).description.toString();
-          user.weather.condition.icon = this.getWeatherDescription(response.current_weather.weathercode).icon.toString();
-          user.weather.current_temperature = response.current_weather.temperature;
-          user.weather.max_temperature = Math.max(...response.hourly.temperature_2m);
-          user.weather.min_temperature = Math.min(...response.hourly.temperature_2m);
-        }
-      } catch (error: any) {
-        this.toaster.error('Server error occurred while fetching weather data!', error);
-        console.error(error);
-      }
-    }
-
+  setUserWeather(user: User, response: WeatherResponse): void {
+    user.weather = {
+      weather_code: response.current_weather.weathercode,
+      condition: {
+        description: this.getWeatherDescription(response.current_weather.weathercode).description,
+        icon: this.getWeatherDescription(response.current_weather.weathercode).icon,
+      },
+      current_temperature: response.current_weather.temperature,
+      max_temperature: Math.max(...response.hourly.temperature_2m),
+      min_temperature: Math.min(...response.hourly.temperature_2m),
+    };
   }
 
   // Weather VMO code description and icons
